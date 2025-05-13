@@ -1,11 +1,11 @@
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 
-def getTrainTest(dataset):
+def getTrainTest(dataset, random_state=None):
     train_dataset, test_dataset = train_test_split(
         dataset, 
         test_size=0.25,  
-        random_state=1,  
+        random_state=random_state,  
         stratify=dataset['loan_status']  
     )
 

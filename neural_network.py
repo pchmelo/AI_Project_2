@@ -36,7 +36,7 @@ for i in range(5):
     print(f"Run {i + 1}/5")
     
     # Get a new train-test split
-    X_train, X_test, y_train, y_test = getTrainTest.getTrainTest(dataset)
+    X_train, X_test, y_train, y_test = getTrainTest.getTrainTest(dataset, random_state=i)
     
     # Perform grid search
     grid_search = GridSearchCV(estimator=nn_model, param_grid=param_grid, cv=3, scoring='accuracy', verbose=2, n_jobs=-1)

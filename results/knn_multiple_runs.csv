@@ -1,0 +1,6 @@
+Run,Best Parameters,Test Accuracy
+1,"{'metric': 'manhattan', 'n_neighbors': 9, 'weights': 'distance'}",0.8917295333892149
+2,"{'metric': 'manhattan', 'n_neighbors': 7, 'weights': 'distance'}",0.8906119027661358
+3,"{'metric': 'manhattan', 'n_neighbors': 9, 'weights': 'distance'}",0.8924280525286393
+4,"{'metric': 'manhattan', 'n_neighbors': 9, 'weights': 'distance'}",0.8901927912824812
+5,"{'metric': 'manhattan', 'n_neighbors': 9, 'weights': 'distance'}",0.8941044984632579

@@ -1,6 +1,6 @@
 Run,Best Parameters,Test Accuracy
-1,"{'activation': 'tanh', 'hidden_layer_sizes': (100, 50), 'learning_rate': 'constant', 'max_iter': 200, 'solver': 'adam'}",0.9142218496786811
+1,"{'activation': 'tanh', 'hidden_layer_sizes': (50,), 'learning_rate': 'constant', 'max_iter': 500, 'solver': 'adam'}",0.9125454037440626
 2,"{'activation': 'tanh', 'hidden_layer_sizes': (100, 50), 'learning_rate': 'constant', 'max_iter': 200, 'solver': 'adam'}",0.9142218496786811
-3,"{'activation': 'tanh', 'hidden_layer_sizes': (100, 50), 'learning_rate': 'constant', 'max_iter': 200, 'solver': 'adam'}",0.9142218496786811
-4,"{'activation': 'tanh', 'hidden_layer_sizes': (100, 50), 'learning_rate': 'constant', 'max_iter': 200, 'solver': 'adam'}",0.9142218496786811
-5,"{'activation': 'tanh', 'hidden_layer_sizes': (100, 50), 'learning_rate': 'constant', 'max_iter': 200, 'solver': 'adam'}",0.9142218496786811
+3,"{'activation': 'tanh', 'hidden_layer_sizes': (50, 50), 'learning_rate': 'constant', 'max_iter': 200, 'solver': 'adam'}",0.9117071807767533
+4,"{'activation': 'tanh', 'hidden_layer_sizes': (50,), 'learning_rate': 'constant', 'max_iter': 500, 'solver': 'adam'}",0.9128248113998324
+5,"{'activation': 'tanh', 'hidden_layer_sizes': (50, 50), 'learning_rate': 'constant', 'max_iter': 200, 'solver': 'adam'}",0.911986588432523

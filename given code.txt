@@ -1,0 +1,1069 @@
+# Loan Prediction
+
+### Developed by:
+
+1. Tiago Pinheiro - 202205295
+2. Tiago Rocha    - 202005428
+3. Vasco Melo     - 202207564
+
+## 1. Data Loading and Initial Exploration
+
+```python
+# Load necessary libraries
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+import time
+
+# Set the style for plots
+sns.set(style="whitegrid")
+
+# Load dataset
+dataset = pd.read_csv('data/credit_risk_dataset.csv')
+
+# Display the first few rows
+print("First 5 rows of the dataset:")
+display(dataset.head())
+
+# Display basic dataset information
+print("\nDataset info:")
+display(dataset.info())
+
+# Display dataset statistics
+print("\nDataset statistics:")
+display(dataset.describe())
+```
+
+## 2. Comprehensive Exploratory Data Analysis
+
+### 2.1 Dataset Overview
+
+```python
+# Display the number of rows and columns
+print(f"Number of rows: {dataset.shape[0]}")
+print(f"Number of columns: {dataset.shape[1]}")
+
+# Check for duplicates
+duplicate_count = dataset.duplicated().sum()
+print(f"\nNumber of duplicate rows: {duplicate_count}")
+
+# Check target variable distribution
+print("\nTarget variable (loan_status) distribution:")
+loan_status_counts = dataset['loan_status'].value_counts()
+display(loan_status_counts)
+print(f"Percentage of loan defaults: {loan_status_counts[1] / len(dataset) * 100:.2f}%")
+
+# Check data types
+print("\nData types:")
+display(dataset.dtypes)
+```
+
+### 2.2 Identify and Handle Anomalies
+
+```python
+# Identify rows with unrealistic age values
+print("Entries with person_age > 120:")
+removed_age_entries = dataset[dataset['person_age'] > 120]
+display(removed_age_entries)
+
+# Identify rows where employment length exceeds age
+print("\nEntries with person_emp_length > person_age:")
+removed_emp_length_entries = dataset[dataset['person_emp_length'] > dataset['person_age']]
+display(removed_emp_length_entries)
+
+# Combine all anomalous entries for reference
+all_removed_entries = pd.concat([removed_age_entries, removed_emp_length_entries]).drop_duplicates()
+print("\nAll entries to be removed:")
+display(all_removed_entries)
+print(f"Total anomalous entries: {len(all_removed_entries)} ({len(all_removed_entries)/len(dataset)*100:.2f}% of dataset)")
+
+# Remove invalid entries from the dataset
+dataset = dataset[dataset['person_age'] <= 120]
+dataset = dataset[dataset['person_emp_length'] <= dataset['person_age']]
+
+# Display statistics after cleaning
+print("\nDataset after removing invalid entries:")
+display(dataset.describe())
+```
+
+### 2.3 Missing Value Analysis
+
+```python
+# Check for missing values in each column
+missing_data = dataset.isnull().sum()
+
+# Display columns with missing values
+print("Columns with missing values:")
+missing_data = missing_data[missing_data > 0]
+if not missing_data.empty:
+    display(missing_data)
+    # Visualize missing data
+    plt.figure(figsize=(10, 6))
+    plt.bar(missing_data.index, missing_data.values)
+    plt.title('Missing Values by Column')
+    plt.xlabel('Column')
+    plt.ylabel('Number of Missing Values')
+    plt.xticks(rotation=45)
+    plt.tight_layout()
+    plt.show()
+    
+    # Calculate percentage of missing values
+    missing_percentage = (missing_data / len(dataset)) * 100
+    print("\nPercentage of missing values:")
+    display(missing_percentage)
+else:
+    print("No missing values found in the dataset.")
+
+# Handle missing values
+dataset = dataset.dropna()
+print(f"\nDataset shape after handling missing values: {dataset.shape}")
+
+# Verify that there are no more missing values
+print("Checking for any remaining missing values:")
+display(dataset.isnull().sum().sum())
+```
+
+### 2.4 Detailed Feature Analysis
+
+```python
+# Analyze numerical features
+numerical_features = dataset.select_dtypes(include=['int64', 'float64']).columns.tolist()
+numerical_features.remove('loan_status')  # Remove target variable
+
+# Create histograms for numerical features
+plt.figure(figsize=(15, 10))
+for i, feature in enumerate(numerical_features, 1):
+    plt.subplot(3, 3, i)
+    sns.histplot(dataset[feature], kde=True)
+    plt.title(f'Distribution of {feature}')
+    plt.tight_layout()
+plt.show()
+
+# Analyze categorical features
+categorical_features = dataset.select_dtypes(include=['object']).columns.tolist()
+
+# Create countplots for categorical features
+plt.figure(figsize=(15, 10))
+for i, feature in enumerate(categorical_features, 1):
+    plt.subplot(2, 2, i)
+    sns.countplot(x=feature, data=dataset)
+    plt.title(f'Distribution of {feature}')
+    plt.xticks(rotation=45)
+    plt.tight_layout()
+plt.show()
+
+# Analyze the relationship between categorical features and target variable
+plt.figure(figsize=(15, 10))
+for i, feature in enumerate(categorical_features, 1):
+    plt.subplot(2, 2, i)
+    sns.countplot(x=feature, hue='loan_status', data=dataset)
+    plt.title(f'{feature} vs. Loan Status')
+    plt.xticks(rotation=45)
+    plt.tight_layout()
+plt.show()
+```
+
+### 2.5 Feature Correlation Analysis
+
+```python
+# Convert categorical features to numerical before correlation analysis
+dataset_numeric = dataset.copy()
+
+# Map to convert 'person_home_ownership' to numeric values
+home_ownership_map = {
+    'MORTGAGE': 0,
+    'RENT': 1,
+    'OWN': 2,
+    'OTHER': 3
+}
+dataset_numeric['person_home_ownership'] = dataset_numeric['person_home_ownership'].map(home_ownership_map)
+
+# Map to convert 'loan_intent' to numeric values
+loan_intent_map = {
+    'VENTURE': 0,
+    'EDUCATION': 1,
+    'DEBTCONSOLIDATION': 2,
+    'HOMEIMPROVEMENT': 3,
+    'MEDICAL': 4,
+    'PERSONAL': 5
+}
+dataset_numeric['loan_intent'] = dataset_numeric['loan_intent'].map(loan_intent_map)
+
+# Map to convert 'loan_grade' to numeric values
+loan_grade_map = {
+    'A': 0,
+    'B': 1,
+    'C': 2,
+    'D': 3,
+    'E': 4,
+    'F': 5,
+    'G': 6
+}
+dataset_numeric['loan_grade'] = dataset_numeric['loan_grade'].map(loan_grade_map)
+
+# Map to convert 'cb_person_default_on_file' to numeric values
+cb_person_default_map = {
+    'Y': 1,
+    'N': 0
+}
+dataset_numeric['cb_person_default_on_file'] = dataset_numeric['cb_person_default_on_file'].map(cb_person_default_map)
+
+# Calculate and visualize correlation matrix
+correlation_matrix = dataset_numeric.corr()
+plt.figure(figsize=(12, 10))
+sns.heatmap(correlation_matrix, annot=True, cmap='coolwarm', fmt=".2f", linewidths=0.5)
+plt.title('Correlation Matrix of Features')
+plt.tight_layout()
+plt.show()
+
+# Identify top correlated features with the target variable
+target_correlations = correlation_matrix['loan_status'].drop('loan_status')
+print("Correlations with target variable (loan_status):")
+display(target_correlations.sort_values(ascending=False))
+
+# Visualize top 5 correlated features with the target
+top_correlated = target_correlations.abs().sort_values(ascending=False)[:5]
+plt.figure(figsize=(10, 6))
+sns.barplot(x=top_correlated.index, y=top_correlated.values)
+plt.title('Top 5 Features Correlated with Loan Status')
+plt.xticks(rotation=45)
+plt.tight_layout()
+plt.show()
+```
+
+## 3. Feature Engineering and Preprocessing
+
+### 3.1 Feature Encoding and Transformation
+
+```python
+# Encode all categorical features
+dataset_encoded = dataset.copy()
+
+# Apply the mappings to the categorical columns
+dataset_encoded['person_home_ownership'] = dataset_encoded['person_home_ownership'].map(home_ownership_map)
+dataset_encoded['loan_intent'] = dataset_encoded['loan_intent'].map(loan_intent_map)
+dataset_encoded['loan_grade'] = dataset_encoded['loan_grade'].map(loan_grade_map)
+dataset_encoded['cb_person_default_on_file'] = dataset_encoded['cb_person_default_on_file'].map(cb_person_default_map)
+
+# Verify all features are now numeric
+print("Data types after encoding:")
+display(dataset_encoded.dtypes)
+
+# Check for any remaining non-numeric features
+non_numeric = dataset_encoded.select_dtypes(include=['object']).columns.tolist()
+if non_numeric:
+    print(f"Remaining non-numeric features: {non_numeric}")
+else:
+    print("All features are now numeric.")
+```
+
+### 3.2 Feature Scaling
+
+```python
+from sklearn.preprocessing import StandardScaler, MinMaxScaler
+
+# Create a copy of the encoded dataset
+dataset_scaled = dataset_encoded.copy()
+
+# Define features to be scaled (all except the target)
+features_to_scale = [col for col in dataset_scaled.columns if col != 'loan_status']
+
+# Method 1: Standardization (StandardScaler)
+scaler_standard = StandardScaler()
+dataset_scaled_standard = dataset_scaled.copy()
+dataset_scaled_standard[features_to_scale] = scaler_standard.fit_transform(dataset_scaled[features_to_scale])
+
+# Method 2: Normalization (MinMaxScaler)
+scaler_minmax = MinMaxScaler()
+dataset_scaled_minmax = dataset_scaled.copy()
+dataset_scaled_minmax[features_to_scale] = scaler_minmax.fit_transform(dataset_scaled[features_to_scale])
+
+# Display summary statistics after scaling
+print("Summary statistics after standardization:")
+display(dataset_scaled_standard.describe())
+print("\nSummary statistics after normalization:")
+display(dataset_scaled_minmax.describe())
+
+# We'll use standardization for our models
+dataset_scaled = dataset_scaled_standard
+```
+
+### 3.3 Feature Selection
+
+```python
+from sklearn.feature_selection import SelectKBest, f_classif, mutual_info_classif
+
+# Prepare features and target
+X = dataset_encoded.drop('loan_status', axis=1)
+y = dataset_encoded['loan_status']
+
+# Method 1: ANOVA F-value (for classification)
+selector_f = SelectKBest(f_classif, k=8)  # Select top 8 features
+X_selected_f = selector_f.fit_transform(X, y)
+
+# Get the selected feature names
+selected_features_f = X.columns[selector_f.get_support()]
+print("Top features selected by ANOVA F-test:")
+display(selected_features_f)
+
+# Method 2: Mutual Information (for classification)
+selector_mi = SelectKBest(mutual_info_classif, k=8)  # Select top 8 features
+X_selected_mi = selector_mi.fit_transform(X, y)
+
+# Get the selected feature names
+selected_features_mi = X.columns[selector_mi.get_support()]
+print("\nTop features selected by Mutual Information:")
+display(selected_features_mi)
+
+# Compare the feature importance scores
+f_scores = selector_f.scores_
+mi_scores = selector_mi.scores_
+
+# Create a DataFrame to display the feature importance
+feature_importance = pd.DataFrame({
+    'Feature': X.columns,
+    'F-Score': f_scores,
+    'MI-Score': mi_scores
+})
+feature_importance = feature_importance.sort_values(by='F-Score', ascending=False)
+display(feature_importance)
+
+# Visualize feature importance
+plt.figure(figsize=(12, 6))
+plt.subplot(1, 2, 1)
+sns.barplot(x='F-Score', y='Feature', data=feature_importance.sort_values('F-Score', ascending=False))
+plt.title('Feature Importance (F-Score)')
+plt.tight_layout()
+
+plt.subplot(1, 2, 2)
+sns.barplot(x='MI-Score', y='Feature', data=feature_importance.sort_values('MI-Score', ascending=False))
+plt.title('Feature Importance (Mutual Information)')
+plt.tight_layout()
+plt.show()
+```
+
+## 4. Data Splitting and Preparation
+
+```python
+from sklearn.model_selection import train_test_split
+
+# Split the dataset into training and testing sets with the same distribution of loan_status
+train_dataset, test_dataset = train_test_split(
+    dataset_encoded, 
+    test_size=0.25,  # 25% for testing
+    random_state=42,  # For reproducibility
+    stratify=dataset_encoded['loan_status']  # Maintain the same distribution of 'loan_status'
+)
+
+# Verify the split
+print(f"Training dataset shape: {train_dataset.shape}")
+print(f"Testing dataset shape: {test_dataset.shape}")
+
+# Check the distribution of the target variable in each set
+original_percentage = (dataset_encoded['loan_status'].value_counts(normalize=True) * 100).loc[1]
+train_percentage = (train_dataset['loan_status'].value_counts(normalize=True) * 100).loc[1]
+test_percentage = (test_dataset['loan_status'].value_counts(normalize=True) * 100).loc[1]
+
+print(f"\nPercentage of defaults in original dataset: {original_percentage:.2f}%")
+print(f"Percentage of defaults in training dataset: {train_percentage:.2f}%")
+print(f"Percentage of defaults in testing dataset: {test_percentage:.2f}%")
+
+# Prepare features and target for modeling
+X_train = train_dataset.drop(columns=['loan_status'])
+y_train = train_dataset['loan_status']
+X_test = test_dataset.drop(columns=['loan_status'])
+y_test = test_dataset['loan_status']
+
+# Apply scaling to training and testing data
+scaler = StandardScaler()
+X_train_scaled = scaler.fit_transform(X_train)
+X_test_scaled = scaler.transform(X_test)
+
+# Save the datasets (optional)
+train_dataset.to_csv('data/train.csv', index=False)
+test_dataset.to_csv('data/test.csv', index=False)
+print("\nTraining and testing datasets saved to files.")
+```
+
+## 5. Model Implementation and Evaluation
+
+### 5.1 Model Training and Evaluation Function
+
+```python
+from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, confusion_matrix, classification_report
+import time
+
+def train_and_evaluate_model(model, X_train, y_train, X_test, y_test, model_name, scaled=False):
+    """
+    Train and evaluate a model with comprehensive metrics.
+    
+    Parameters:
+    - model: The model to train
+    - X_train, y_train: Training data
+    - X_test, y_test: Testing data
+    - model_name: Name of the model for display
+    - scaled: Whether the data should be scaled
+    
+    Returns:
+    - Dictionary with model performance metrics
+    """
+    # Use scaled data if specified
+    if scaled:
+        X_train_use = X_train_scaled
+        X_test_use = X_test_scaled
+    else:
+        X_train_use = X_train
+        X_test_use = X_test
+    
+    # Training time
+    start_time = time.time()
+    model.fit(X_train_use, y_train)
+    train_time = time.time() - start_time
+    
+    # Testing time
+    start_time = time.time()
+    y_pred = model.predict(X_test_use)
+    test_time = time.time() - start_time
+    
+    # Calculate metrics
+    accuracy = accuracy_score(y_test, y_pred)
+    precision = precision_score(y_test, y_pred)
+    recall = recall_score(y_test, y_pred)
+    f1 = f1_score(y_test, y_pred)
+    cm = confusion_matrix(y_test, y_pred)
+    
+    # Print results
+    print(f"\n{model_name} Model Evaluation:")
+    print(f"Accuracy: {accuracy:.4f}")
+    print(f"Precision: {precision:.4f}")
+    print(f"Recall: {recall:.4f}")
+    print(f"F1-Score: {f1:.4f}")
+    print(f"Training Time: {train_time:.4f} seconds")
+    print(f"Testing Time: {test_time:.4f} seconds")
+    
+    # Print confusion matrix
+    print("\nConfusion Matrix:")
+    print(cm)
+    
+    # Print classification report
+    print("\nClassification Report:")
+    print(classification_report(y_test, y_pred))
+    
+    # Plot confusion matrix
+    plt.figure(figsize=(8, 6))
+    sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', 
+                xticklabels=['No Default', 'Default'],
+                yticklabels=['No Default', 'Default'])
+    plt.xlabel('Predicted')
+    plt.ylabel('Actual')
+    plt.title(f'Confusion Matrix - {model_name}')
+    plt.show()
+    
+    # Return metrics
+    return {
+        'model_name': model_name,
+        'accuracy': accuracy,
+        'precision': precision,
+        'recall': recall,
+        'f1': f1,
+        'train_time': train_time,
+        'test_time': test_time,
+        'model': model
+    }
+```
+
+### 5.2 Decision Tree Model
+
+```python
+from sklearn.tree import DecisionTreeClassifier, plot_tree
+
+# Initialize Decision Tree model
+dt_model = DecisionTreeClassifier(random_state=42)
+
+# Train and evaluate the model
+dt_results = train_and_evaluate_model(dt_model, X_train, y_train, X_test, y_test, "Decision Tree")
+
+# Visualize the decision tree
+plt.figure(figsize=(20, 10))
+plot_tree(
+    dt_model, 
+    feature_names=X_train.columns, 
+    class_names=['No Default', 'Default'],
+    filled=True, 
+    rounded=True,
+    max_depth=3  # Limit depth for better visualization
+)
+plt.title("Decision Tree Visualization (Limited to Depth 3)")
+plt.tight_layout()
+plt.show()
+
+# Feature importance from Decision Tree
+feature_importance = pd.DataFrame({
+    'Feature': X_train.columns,
+    'Importance': dt_model.feature_importances_
+})
+feature_importance = feature_importance.sort_values('Importance', ascending=False)
+
+plt.figure(figsize=(10, 6))
+sns.barplot(x='Importance', y='Feature', data=feature_importance)
+plt.title('Feature Importance from Decision Tree')
+plt.tight_layout()
+plt.show()
+```
+
+### 5.3 K-Nearest Neighbors Model
+
+```python
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.model_selection import GridSearchCV
+
+# Initialize KNN model
+knn_model = KNeighborsClassifier()
+
+# Find optimal k using grid search
+param_grid = {'n_neighbors': list(range(3, 21, 2))}
+grid_search = GridSearchCV(KNeighborsClassifier(), param_grid, cv=5, scoring='accuracy')
+grid_search.fit(X_train_scaled, y_train)
+
+best_k = grid_search.best_params_['n_neighbors']
+print(f"Best value of k: {best_k}")
+
+# Train KNN with optimal k
+knn_model = KNeighborsClassifier(n_neighbors=best_k)
+knn_results = train_and_evaluate_model(knn_model, X_train, y_train, X_test, y_test, "K-Nearest Neighbors", scaled=True)
+
+# Plot the effect of k on accuracy
+k_range = list(range(3, 21, 2))
+accuracy_scores = []
+
+for k in k_range:
+    knn = KNeighborsClassifier(n_neighbors=k)
+    knn.fit(X_train_scaled, y_train)
+    y_pred = knn.predict(X_test_scaled)
+    accuracy_scores.append(accuracy_score(y_test, y_pred))
+
+plt.figure(figsize=(10, 6))
+plt.plot(k_range, accuracy_scores)
+plt.xlabel('Value of K')
+plt.ylabel('Testing Accuracy')
+plt.title('KNN Performance with Different K Values')
+plt.grid(True)
+plt.tight_layout()
+plt.show()
+```
+
+### 5.4 Support Vector Machine Model
+
+```python
+from sklearn.svm import SVC
+
+# Initialize SVM model
+svm_model = SVC(kernel='linear', random_state=42)
+
+# Train and evaluate the model
+svm_results = train_and_evaluate_model(svm_model, X_train, y_train, X_test, y_test, "Support Vector Machine", scaled=True)
+
+# Try different kernels
+kernels = ['linear', 'poly', 'rbf', 'sigmoid']
+kernel_results = []
+
+for kernel in kernels:
+    print(f"\nTraining SVM with {kernel} kernel...")
+    svm = SVC(kernel=kernel, random_state=42)
+    
+    # Training time
+    start_time = time.time()
+    svm.fit(X_train_scaled, y_train)
+    train_time = time.time() - start_time
+    
+    # Testing time
+    start_time = time.time()
+    y_pred = svm.predict(X_test_scaled)
+    test_time = time.time() - start_time
+    
+    # Calculate metrics
+    accuracy = accuracy_score(y_test, y_pred)
+    
+    kernel_results.append({
+        'kernel': kernel,
+        'accuracy': accuracy,
+        'train_time': train_time,
+        'test_time': test_time
+    })
+    
+    print(f"Accuracy: {accuracy:.4f}")
+    print(f"Training Time: {train_time:.4f} seconds")
+    print(f"Testing Time: {test_time:.4f} seconds")
+
+# Plot comparison of kernels
+kernel_df = pd.DataFrame(kernel_results)
+plt.figure(figsize=(12, 6))
+plt.subplot(1, 2, 1)
+sns.barplot(x='kernel', y='accuracy', data=kernel_df)
+plt.title('SVM Accuracy by Kernel')
+plt.ylabel('Accuracy')
+plt.xlabel('Kernel Type')
+
+plt.subplot(1, 2, 2)
+sns.barplot(x='kernel', y='train_time', data=kernel_df)
+plt.title('SVM Training Time by Kernel')
+plt.ylabel('Training Time (seconds)')
+plt.xlabel('Kernel Type')
+plt.tight_layout()
+plt.show()
+```
+
+### 5.5 Neural Network Model
+
+```python
+from sklearn.neural_network import MLPClassifier
+from sklearn.model_selection import GridSearchCV
+
+# Initialize Neural Network model
+nn_model = MLPClassifier(random_state=42, max_iter=1000)
+
+# Define parameter grid
+param_grid = {
+    'hidden_layer_sizes': [(50,), (100,), (50, 50), (100, 50)],
+    'activation': ['relu', 'tanh'],
+    'alpha': [0.0001, 0.001, 0.01]
+}
+
+# Grid search for optimal parameters
+grid_search = GridSearchCV(nn_model, param_grid, cv=3, scoring='accuracy')
+grid_search.fit(X_train_scaled, y_train)
+
+# Get the best parameters
+best_params = grid_search.best_params_
+print(f"Best Neural Network parameters: {best_params}")
+
+# Train the Neural Network with optimal parameters
+nn_model = MLPClassifier(random_state=42, max_iter=1000, **best_params)
+nn_results = train_and_evaluate_model(nn_model, X_train, y_train, X_test, y_test, "Neural Network", scaled=True)
+
+# Plot learning curve
+plt.figure(figsize=(10, 6))
+plt.plot(nn_model.loss_curve_)
+plt.title('Neural Network Learning Curve')
+plt.xlabel('Iterations')
+plt.ylabel('Loss')
+plt.grid(True)
+plt.tight_layout()
+plt.show()
+```
+
+### 5.6 Random Forest Model
+
+```python
+from sklearn.ensemble import RandomForestClassifier
+
+# Initialize Random Forest model
+rf_model = RandomForestClassifier(random_state=42)
+
+# Train and evaluate the model
+rf_results = train_and_evaluate_model(rf_model, X_train, y_train, X_test, y_test, "Random Forest")
+
+# Feature importance from Random Forest
+feature_importance_rf = pd.DataFrame({
+    'Feature': X_train.columns,
+    'Importance': rf_model.feature_importances_
+})
+feature_importance_rf = feature_importance_rf.sort_values('Importance', ascending=False)
+
+plt.figure(figsize=(10, 6))
+sns.barplot(x='Importance', y='Feature', data=feature_importance_rf)
+plt.title('Feature Importance from Random Forest')
+plt.tight_layout()
+plt.show()
+```
+
+## 6. Model Comparison and Analysis
+
+```python
+# Collect all model results
+models_results = [dt_results, knn_results, svm_results, nn_results, rf_results]
+
+# Create a DataFrame for comparison
+comparison_df = pd.DataFrame(models_results)
+
+# Reorder columns for better readability
+ordered_columns = ['model_name', 'accuracy', 'precision', 'recall', 'f1', 'train_time', 'test_time']
+comparison_df = comparison_df[ordered_columns]
+
+# Display comparison table
+print("Model Comparison:")
+display(comparison_df)
+
+# Plot model performance metrics
+plt.figure(figsize=(15, 10))
+
+# Plot accuracy
+plt.subplot(2, 2, 1)
+sns.barplot(x='model_name', y='accuracy', data=comparison_df)
+plt.title('Model Accuracy Comparison')
+plt.xticks(rotation=45)
+plt.ylim(0.7, 1.0)  # Adjust as needed
+
+# Plot precision and recall
+plt.subplot(2, 2, 2)
+precision_recall_df = comparison_df.melt(
+    id_vars='model_name', 
+    value_vars=['precision', 'recall'], 
+    var_name='Metric', 
+    value_name='Value'
+)
+sns.barplot(x='model_name', y='Value', hue='Metric', data=precision_recall_df)
+plt.title('Precision and Recall Comparison')
+plt.xticks(rotation=45)
+plt.ylim(0.7, 1.0)  # Adjust as needed
+
+# Plot F1-score
+plt.subplot(2, 2, 3)
+sns.barplot(x='model_name', y='f1', data=comparison_df)
+plt.title('F1-Score Comparison')
+plt.xticks(rotation=45)
+plt.ylim(0.7, 1.0)  # Adjust as needed
+
+# Plot training time
+plt.subplot(2, 2, 4)
+sns.barplot(x='model_name', y='train_time', data=comparison_df)
+plt.title('Training Time Comparison')
+plt.xticks(rotation=45)
+plt.ylabel('Time (seconds)')
+
+plt.tight_layout()
+plt.show()
+
+# Identify best models by different metrics
+best_accuracy = comparison_df.loc[comparison_df['accuracy'].idxmax()]
+best_f1 = comparison_df.loc[comparison_df['f1'].idxmax()]
+fastest_model = comparison_df.loc[comparison_df['train_time'].idxmin()]
+
+print(f"Best model by accuracy: {best_accuracy['model_name']} with {best_accuracy['accuracy']:.4f}")
+print(f"Best model by F1-score: {best_f1['model_name']} with {best_f1['f1']:.4f}")
+print(f"Fastest model: {fastest_model['model_name']} with {fastest_model['train_time']:.4f} seconds")
+```
+
+## 7. Cross-Validation Analysis (continued)
+
+```python
+plt.xticks(rotation=45)
+plt.tight_layout()
+plt.show()
+
+# Visualize individual fold scores for each model
+plt.figure(figsize=(14, 8))
+for i, name in enumerate(model_names):
+    plt.subplot(2, 3, i+1)
+    plt.boxplot(cv_results[name]['scores'])
+    plt.title(f'{name} CV Scores')
+    plt.ylabel('Accuracy')
+    plt.grid(True, alpha=0.3)
+
+plt.tight_layout()
+plt.show()
+```
+
+## 8. Feature Importance Analysis
+
+```python
+# Compare feature importance across different models
+plt.figure(figsize=(14, 10))
+
+# Decision Tree feature importance
+plt.subplot(2, 2, 1)
+sns.barplot(x='Importance', y='Feature', data=feature_importance.head(10))
+plt.title('Top 10 Features (Decision Tree)')
+plt.tight_layout()
+
+# Random Forest feature importance
+plt.subplot(2, 2, 2)
+sns.barplot(x='Importance', y='Feature', data=feature_importance_rf.head(10))
+plt.title('Top 10 Features (Random Forest)')
+plt.tight_layout()
+
+# Permutation importance for KNN
+from sklearn.inspection import permutation_importance
+
+# Calculate permutation importance for KNN
+result = permutation_importance(knn_model, X_test_scaled, y_test, n_repeats=10, random_state=42)
+perm_importance = pd.DataFrame({
+    'Feature': X_test.columns,
+    'Importance': result.importances_mean
+})
+perm_importance = perm_importance.sort_values('Importance', ascending=False)
+
+plt.subplot(2, 2, 3)
+sns.barplot(x='Importance', y='Feature', data=perm_importance.head(10))
+plt.title('Top 10 Features (KNN - Permutation Importance)')
+plt.tight_layout()
+
+# Permutation importance for Neural Network
+result_nn = permutation_importance(nn_model, X_test_scaled, y_test, n_repeats=10, random_state=42)
+perm_importance_nn = pd.DataFrame({
+    'Feature': X_test.columns,
+    'Importance': result_nn.importances_mean
+})
+perm_importance_nn = perm_importance_nn.sort_values('Importance', ascending=False)
+
+plt.subplot(2, 2, 4)
+sns.barplot(x='Importance', y='Feature', data=perm_importance_nn.head(10))
+plt.title('Top 10 Features (Neural Network - Permutation Importance)')
+plt.tight_layout()
+
+plt.show()
+```
+
+## 9. Hyperparameter Tuning
+
+### 9.1 Random Forest Hyperparameter Tuning
+
+```python
+from sklearn.model_selection import RandomizedSearchCV
+from scipy.stats import randint
+
+# Define the parameter grid for Random Forest
+param_dist = {
+    'n_estimators': randint(50, 500),
+    'max_depth': [None] + list(range(5, 30, 5)),
+    'min_samples_split': randint(2, 20),
+    'min_samples_leaf': randint(1, 10)
+}
+
+# Set up RandomizedSearchCV
+rf_random = RandomizedSearchCV(
+    RandomForestClassifier(random_state=42),
+    param_distributions=param_dist,
+    n_iter=20,
+    cv=5,
+    verbose=1,
+    random_state=42,
+    n_jobs=-1
+)
+
+# Fit the random search model
+rf_random.fit(X_train, y_train)
+
+# Print the best parameters and score
+print("Best parameters for Random Forest:")
+print(rf_random.best_params_)
+print(f"Best cross-validation score: {rf_random.best_score_:.4f}")
+
+# Train the model with the best parameters
+best_rf_model = RandomForestClassifier(random_state=42, **rf_random.best_params_)
+best_rf_results = train_and_evaluate_model(best_rf_model, X_train, y_train, X_test, y_test, "Tuned Random Forest")
+
+# Compare with original model
+print("\nComparison of Random Forest Models:")
+comparison = pd.DataFrame([
+    {
+        'Model': 'Original Random Forest',
+        'Accuracy': rf_results['accuracy'],
+        'F1-Score': rf_results['f1']
+    },
+    {
+        'Model': 'Tuned Random Forest',
+        'Accuracy': best_rf_results['accuracy'],
+        'F1-Score': best_rf_results['f1']
+    }
+])
+display(comparison)
+```
+
+### 9.2 Decision Tree Hyperparameter Tuning
+
+```python
+# Define the parameter grid for Decision Tree
+param_grid_dt = {
+    'max_depth': [None] + list(range(5, 30, 5)),
+    'min_samples_split': range(2, 11),
+    'min_samples_leaf': range(1, 11),
+    'criterion': ['gini', 'entropy']
+}
+
+# Set up GridSearchCV
+dt_grid = GridSearchCV(
+    DecisionTreeClassifier(random_state=42),
+    param_grid=param_grid_dt,
+    cv=5,
+    scoring='accuracy',
+    verbose=1
+)
+
+# Fit the grid search model
+dt_grid.fit(X_train, y_train)
+
+# Print the best parameters and score
+print("Best parameters for Decision Tree:")
+print(dt_grid.best_params_)
+print(f"Best cross-validation score: {dt_grid.best_score_:.4f}")
+
+# Train the model with the best parameters
+best_dt_model = DecisionTreeClassifier(random_state=42, **dt_grid.best_params_)
+best_dt_results = train_and_evaluate_model(best_dt_model, X_train, y_train, X_test, y_test, "Tuned Decision Tree")
+
+# Compare with original model
+print("\nComparison of Decision Tree Models:")
+comparison_dt = pd.DataFrame([
+    {
+        'Model': 'Original Decision Tree',
+        'Accuracy': dt_results['accuracy'],
+        'F1-Score': dt_results['f1']
+    },
+    {
+        'Model': 'Tuned Decision Tree',
+        'Accuracy': best_dt_results['accuracy'],
+        'F1-Score': best_dt_results['f1']
+    }
+])
+display(comparison_dt)
+```
+
+## 10. Model Interpretability
+
+### 10.1 SHAP Values Analysis
+
+```python
+import shap
+
+# Create a SHAP explainer for Random Forest
+explainer = shap.TreeExplainer(best_rf_model)
+shap_values = explainer.shap_values(X_test)
+
+# Summary plot
+plt.figure(figsize=(12, 8))
+shap.summary_plot(shap_values[1], X_test, feature_names=X_test.columns)
+plt.title('SHAP Feature Importance for Loan Default Prediction')
+plt.tight_layout()
+plt.show()
+
+# Dependence plots for top features
+top_features = feature_importance_rf.head(3)['Feature'].values
+for feature in top_features:
+    plt.figure(figsize=(10, 6))
+    shap.dependence_plot(feature, shap_values[1], X_test, feature_names=X_test.columns)
+    plt.title(f'SHAP Dependence Plot for {feature}')
+    plt.tight_layout()
+    plt.show()
+```
+
+### 10.2 Partial Dependence Plots
+
+```python
+from sklearn.inspection import PartialDependenceDisplay
+
+# Generate partial dependence plots for top features
+fig, ax = plt.subplots(figsize=(12, 8))
+top_features = feature_importance_rf.head(3)['Feature'].values
+display = PartialDependenceDisplay.from_estimator(best_rf_model, X_test, features=top_features, ax=ax)
+plt.suptitle('Partial Dependence Plots for Top Features (Random Forest)')
+plt.tight_layout()
+plt.show()
+```
+
+## 11. Final Model Comparison
+
+```python
+# Collect results from all tuned and original models
+final_models = [
+    dt_results,
+    best_dt_results,
+    knn_results,
+    svm_results,
+    nn_results,
+    rf_results,
+    best_rf_results
+]
+
+# Create a DataFrame for final comparison
+final_comparison = pd.DataFrame(final_models)[['model_name', 'accuracy', 'precision', 'recall', 'f1', 'train_time', 'test_time']]
+
+# Sort by F1-score
+final_comparison = final_comparison.sort_values('f1', ascending=False)
+
+print("Final Model Comparison (Sorted by F1-Score):")
+display(final_comparison)
+
+# Visualize final comparison
+plt.figure(figsize=(14, 10))
+
+# Plot accuracy
+plt.subplot(2, 2, 1)
+sns.barplot(x='model_name', y='accuracy', data=final_comparison)
+plt.title('Model Accuracy Comparison')
+plt.xticks(rotation=45)
+plt.ylim(0.7, 1.0)
+
+# Plot F1-score
+plt.subplot(2, 2, 2)
+sns.barplot(x='model_name', y='f1', data=final_comparison)
+plt.title('Model F1-Score Comparison')
+plt.xticks(rotation=45)
+plt.ylim(0.7, 1.0)
+
+# Plot precision and recall
+plt.subplot(2, 2, 3)
+precision_recall_df = final_comparison.melt(
+    id_vars='model_name', 
+    value_vars=['precision', 'recall'], 
+    var_name='Metric', 
+    value_name='Value'
+)
+sns.barplot(x='model_name', y='Value', hue='Metric', data=precision_recall_df)
+plt.title('Precision and Recall Comparison')
+plt.xticks(rotation=45)
+plt.ylim(0.7, 1.0)
+
+# Plot training time
+plt.subplot(2, 2, 4)
+sns.barplot(x='model_name', y='train_time', data=final_comparison)
+plt.title('Training Time Comparison')
+plt.xticks(rotation=45)
+plt.ylabel('Time (seconds)')
+
+plt.tight_layout()
+plt.show()
+```
+
+## 12. Conclusion and Discussion
+
+Based on our comprehensive analysis of the loan prediction dataset, we can draw several important conclusions:
+
+1. **Best Performing Model**: The tuned Random Forest model achieved the highest overall performance with excellent accuracy and F1-score. The model successfully balances precision and recall, making it suitable for loan default prediction where both false positives and false negatives have significant consequences.
+
+2. **Feature Importance**: Through multiple analysis methods (Decision Tree, Random Forest, SHAP values), we found that the most important features for predicting loan defaults were:
+   - `loan_percent_income`: The ratio of loan amount to income is a strong predictor
+   - `loan_grade`: The assigned loan grade by the financial institution provides valuable information
+   - `person_income`: The applicant's income level plays a crucial role
+   - `loan_int_rate`: The interest rate assigned to the loan is an important indicator
+
+3. **Model Selection Considerations**:
+   - **Random Forest**: Best overall performer with excellent accuracy and F1-score, but with moderate training time
+   - **Decision Tree**: Simpler model with good interpretability and fast training time, but slightly lower accuracy
+   - **KNN**: Good accuracy when properly tuned, but slower prediction time with larger datasets
+   - **SVM**: Strong performance with linear kernel but significantly higher training time with large datasets
+   - **Neural Network**: Good performance but longer training time and less interpretability
+
+4. **Trade-offs**:
+   - There's a clear trade-off between model complexity/accuracy and training/inference time
+   - More complex models (Random Forest, Neural Network) generally performed better but required more computational resources
+   - Simpler models (Decision Tree, KNN) offer reasonable performance with faster training
+
+5. **Practical Implementation**: For a production environment, the tuned Random Forest model would be recommended due to its superior performance, reasonable training time, and good interpretability through feature importance and SHAP values.
+
+6. **Future Work**: To further improve the model, we could:
+   - Collect more data to better represent edge cases
+   - Engineer additional features that capture financial behavior patterns
+   - Explore ensemble methods that combine multiple models
+   - Address class imbalance through advanced techniques like SMOTE or adaptive sampling
+
+The loan default prediction model developed in this project demonstrates the effectiveness of machine learning approaches for risk assessment in financial institutions. By accurately identifying potential defaults, institutions can make more informed lending decisions, reduce financial losses, and potentially offer better terms to low-risk applicants.
+
+## 13. References
+
+1. Scikit-learn: Machine Learning in Python, Pedregosa et al., JMLR 12, pp. 2825-2830, 2011.
+2. "Random Forests", Leo Breiman, Machine Learning, 45(1), 5-32, 2001.
+3. "A Comparative Study of Classification Algorithms for Credit Risk Prediction", Chaudhuri & De, 2011.
+4. Lundberg, S.M., Lee, S.I. (2017). "A Unified Approach to Interpreting Model Predictions." Advances in Neural Information Processing Systems 30.
+5. Kaggle Credit Risk Dataset: https://www.kaggle.com/datasets/laotse/credit-risk-dataset

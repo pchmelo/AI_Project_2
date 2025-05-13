@@ -1,0 +1,25 @@
+Model Name: DecisionTree
+Saved at: 20250512_160243
+
+Performance Metrics:
+Accuracy: 0.9508
+Precision: 0.9498
+Recall: 0.9508
+F1: 0.9480
+Train_time: 0.1217
+Test_time: 0.0020
+
+Model Hyperparameters:
+ccp_alpha: 0.0
+class_weight: None
+criterion: entropy
+max_depth: 10
+max_features: None
+max_leaf_nodes: None
+min_impurity_decrease: 0.0
+min_samples_leaf: 4
+min_samples_split: 20
+min_weight_fraction_leaf: 0.0
+monotonic_cst: None
+random_state: 42
+splitter: best
